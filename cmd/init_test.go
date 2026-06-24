@@ -10,7 +10,10 @@ import (
 func TestHandleInit(t *testing.T) {
 	// 1. Setup: Ensure we start in a clean state by removing any existing .qrk directory
 	repoDir := ".qrk"
-	os.RemoveAll(repoDir)
+
+	if err := os.RemoveAll(repoDir); err != nil {
+		return
+	}
 
 	// 2. Test initial creation
 	HandleInit()
