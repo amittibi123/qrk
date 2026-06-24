@@ -25,7 +25,8 @@ func main() {
 	case "add":
 		// Pass only the remaining arguments to the add handler (the file path)
 		cmd.HandleAdd(os.Args[2:])
-
+	case "status":
+		cmd.PrintStatus()
 	default:
 		fmt.Printf("❌ Unknown command: '%s'\n", command)
 		fmt.Println("Run 'qrk' without arguments to see available commands.")

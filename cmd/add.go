@@ -5,62 +5,73 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/go-git/go-git/v5"
 )
 
-// HandleAdd handles the "qrk add <filename>" command execution.
-// It streams the file in chunks to prevent high memory consumption and prepares it for tracking.
+// HandleAdd handles the "qrk add <filename>" command execution with local git backup.
 func HandleAdd(args []string) {
 	if len(args) < 1 {
 		fmt.Println("❌ Error: Please specify a file to add.")
-		fmt.Println("Usage: qrk add <filename>")
 		return
 	}
-
 	fileName := args[0]
 
-	// Open the target file for reading
 	file, err := os.Open(fileName)
 	if err != nil {
-		fmt.Printf("❌ Error: Could not open file '%s': %v\n", fileName, err)
+		fmt.Printf("❌ Error: %v\n", err)
 		return
 	}
-	// Ensure the file descriptor is closed when the function finishes
 	defer file.Close()
 
-	fmt.Printf("📦 Tracking file: %s\n", fileName)
-	fmt.Println("⏳ Processing file chunks...")
+	repo, err := git.PlainOpen(".qrk")
+	if err != nil {
+		fmt.Printf("❌ Error: qrk is not initialized. Run 'qrk init' first.\n")
+		return
+	}
+	worktree, err := repo.Worktree()
+	if err != nil {
+		fmt.Printf("❌ Error getting worktree: %v\n", err)
+		return
+	}
 
-	// Define a fixed chunk size (e.g., 1MB = 1024 * 1024 bytes)
-	// In the future, this can be upgraded to dynamic content-defined chunking (CDC)
 	const chunkSize = 1024 * 1024
 	buffer := make([]byte, chunkSize)
-
 	chunkCounter := 0
 
 	for {
-		// Read up to chunkSize bytes from the file into our buffer
 		bytesRead, err := file.Read(buffer)
 		if err != nil && err != io.EOF {
-			fmt.Printf("❌ Error reading file data: %v\n", err)
 			return
 		}
-
-		// EOF (End of File) means we have successfully finished reading the entire file
 		if bytesRead == 0 {
 			break
 		}
-
 		chunkCounter++
 
-		// Generate a unique SHA-256 hash for the current slice of data (the chunk)
-		// This hash acts as the unique identifier for deduplication
 		hasher := sha256.New()
 		hasher.Write(buffer[:bytesRead])
 		chunkHash := fmt.Sprintf("%x", hasher.Sum(nil))
 
-		// Log the processed chunk (printing only the first 12 characters of the hash for clean output)
-		fmt.Printf("  -> Processed Chunk #%d | Size: %d bytes | Hash: %s...\n", chunkCounter, bytesRead, chunkHash[:12])
+		chunkFolder := ".qrk/chunks"
+		_ = os.MkdirAll(chunkFolder, 0755)
+		chunkPath := fmt.Sprintf("%s/%s", chunkFolder, chunkHash)
+
+		err = os.WriteFile(chunkPath, buffer[:bytesRead], 0644)
+		if err != nil {
+			fmt.Printf("❌ Error saving chunk: %v\n", err)
+			return
+		}
+
+		relativeChunkPath := fmt.Sprintf("chunks/%s", chunkHash)
+		_, err = worktree.Add(relativeChunkPath)
+		if err != nil {
+			fmt.Printf("❌ Git tracking error: %v\n", err)
+			return
+		}
+
+		fmt.Printf("🚀 Chunk #%d staged and tracked in git database!\n", chunkCounter)
 	}
 
-	fmt.Printf("✨ Successfully processed %d chunks for '%s'.\n", chunkCounter, fileName)
+	fmt.Printf("✨ Successfully added all %d chunks to the local database!\n", chunkCounter)
 }
