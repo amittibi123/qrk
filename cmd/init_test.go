@@ -23,6 +23,10 @@ func TestHandleInit(t *testing.T) {
 		t.Errorf("Expected directory '%s' to be created, but it does not exist", repoDir)
 	}
 
+	if _, err := os.Stat(".qrk/.git"); os.IsNotExist(err) {
+		t.Errorf("Expected directory '%s' to be created, but it does not exist", repoDir)
+	}
+
 	// 3. Test duplicate initialization (should fail gracefully without crashing)
 	// We run it a second time to ensure our safeguard logic works
 	HandleInit()
