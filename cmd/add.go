@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"crypto/sha256"
 	"fmt"
 	"io"
 	"os"
@@ -9,7 +8,8 @@ import (
 	"github.com/go-git/go-git/v5"
 )
 
-// HandleAdd handles the "qrk add <filename>" command execution with local git backup.
+// HandleAdd handles the "qrk add <filename>" command execution.
+// It splits the file into simple sequential chunks and stages them in git.
 func HandleAdd(args []string) {
 	if len(args) < 1 {
 		fmt.Println("❌ Error: Please specify a file to add.")
@@ -24,24 +24,30 @@ func HandleAdd(args []string) {
 	}
 	defer file.Close()
 
+	// Open the local git repository inside .qrk
 	repo, err := git.PlainOpen(".qrk")
 	if err != nil {
 		fmt.Printf("❌ Error: qrk is not initialized. Run 'qrk init' first.\n")
 		return
 	}
-	worktree, err := repo.Worktree()
+	_, err = repo.Worktree()
 	if err != nil {
 		fmt.Printf("❌ Error getting worktree: %v\n", err)
 		return
 	}
 
-	const chunkSize = 1024 * 1024
+	const chunkSize = 1024 * 1024 // 1MB
 	buffer := make([]byte, chunkSize)
 	chunkCounter := 0
+
+	// Create the chunks directory if it doesn't exist
+	chunkFolder := ".qrk/chunks"
+	_ = os.MkdirAll(chunkFolder, 0755)
 
 	for {
 		bytesRead, err := file.Read(buffer)
 		if err != nil && err != io.EOF {
+			fmt.Printf("❌ Error reading file: %v\n", err)
 			return
 		}
 		if bytesRead == 0 {
@@ -49,29 +55,31 @@ func HandleAdd(args []string) {
 		}
 		chunkCounter++
 
-		hasher := sha256.New()
-		hasher.Write(buffer[:bytesRead])
-		chunkHash := fmt.Sprintf("%x", hasher.Sum(nil))
+		// Generate sequential chunk name based on original filename and counter
+		chunkName := fmt.Sprintf("%s_chunk_%d", fileName, chunkCounter)
+		chunkPath := fmt.Sprintf("%s/%s", chunkFolder, chunkName)
 
-		chunkFolder := ".qrk/chunks"
-		_ = os.MkdirAll(chunkFolder, 0755)
-		chunkPath := fmt.Sprintf("%s/%s", chunkFolder, chunkHash)
-
+		// Write chunk data directly to disk
 		err = os.WriteFile(chunkPath, buffer[:bytesRead], 0644)
 		if err != nil {
 			fmt.Printf("❌ Error saving chunk: %v\n", err)
 			return
 		}
 
-		relativeChunkPath := fmt.Sprintf("chunks/%s", chunkHash)
-		_, err = worktree.Add(relativeChunkPath)
-		if err != nil {
-			fmt.Printf("❌ Git tracking error: %v\n", err)
-			return
-		}
-
-		fmt.Printf("🚀 Chunk #%d staged and tracked in git database!\n", chunkCounter)
+		fmt.Printf("🚀 Chunk #%d (%s) staged successfully!\n", chunkCounter, chunkName)
 	}
 
-	fmt.Printf("✨ Successfully added all %d chunks to the local database!\n", chunkCounter)
+	f, err := os.OpenFile(".qrk/index.txt", os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		panic(err)
+		return
+	}
+	defer f.Close()
+	_, err = fmt.Fprintln(f, fileName)
+	if err != nil {
+		panic(err)
+		return
+	}
+	fmt.Printf(" successfully added %s to index.txt\n", fileName)
+	fmt.Printf("✨ Successfully added all %d chunks for '%s' to the local database!\n", chunkCounter, fileName)
 }

@@ -52,5 +52,14 @@ func HandleInit() {
 	if err := InitGitRepository(".qrk"); err != nil {
 		fmt.Printf("❌ Git Init Warning: %v\n", err)
 	}
+
+	f, err := os.Create(".qrk/index.txt")
+	if err != nil {
+		// Panic here only if we absolutely cannot create the file
+		panic(fmt.Errorf("failed to create index.txt: %w", err))
+	}
+	// Always close the file handle after creating it to avoid memory leaks
+	defer f.Close()
+
 	fmt.Println("✨ Successfully initialized empty qrk repository in .qrk/")
 }
