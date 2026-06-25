@@ -29,6 +29,8 @@ func main() {
 		cmd.PrintStatus()
 	case "commit":
 		cmd.HandleCommit("")
+	case "head":
+		cmd.HandelHead(os.Args[1:])
 	default:
 		fmt.Printf("❌ Unknown command: '%s'\n", command)
 		fmt.Println("Run 'qrk' without arguments to see available commands.")
