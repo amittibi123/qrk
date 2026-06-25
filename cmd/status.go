@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"database/sql"
 	"fmt"
 
 	"github.com/go-git/go-git/v5"
@@ -40,14 +41,37 @@ func HandleStatus() git.Status {
 }
 
 func PrintStatus() {
-	status := HandleStatus()
-	fmt.Println("🟢 Staged changes ready for commit in qrk database:")
-	// 5. רצים על כל הקבצים/צ'אנקים שגיט זיהה ב-Staging
-	for path, fileStatus := range status {
-		// אנחנו מחפשים קבצים שנוספו או השתנו ב-Staging Area
-		if fileStatus.Staging == git.Added || fileStatus.Staging == git.Modified {
-			fmt.Printf("  • [Staged] %s\n", path)
+	db, err := sql.Open("sqlite3", ".qrk/my_database.db")
+	if err != nil {
+		fmt.Println("❌ Error: qrk repository not found. Run 'qrk init' first.")
+		return
+	}
+	defer db.Close()
+
+	rows, err := db.Query("SELECT path FROM qrk")
+	if err != nil {
+		fmt.Println("❌ Error reading staged files:", err)
+		return
+	}
+	defer rows.Close()
+
+	var entries []string
+	for rows.Next() {
+		var p string
+		if err := rows.Scan(&p); err != nil {
+			fmt.Println("Error scanning row:", err)
+			return
 		}
+		entries = append(entries, p)
 	}
 
+	if len(entries) == 0 {
+		fmt.Println("ℹ️ Nothing staged. Use 'qrk add <file>' to track files.")
+		return
+	}
+
+	fmt.Println("🟢 Staged changes ready for commit:")
+	for _, p := range entries {
+		fmt.Printf("  • [Staged] %s\n", p)
+	}
 }

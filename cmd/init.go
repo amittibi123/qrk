@@ -1,10 +1,14 @@
 package cmd
 
 import (
+	"database/sql"
+	_ "database/sql"
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/go-git/go-git/v5"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 // InitGitRepository initializes a brand new Git repository in the specified path.
@@ -26,6 +30,20 @@ func InitGitRepository(path string) error {
 
 	fmt.Println("✅ Successfully initialized Git repository programmatically.")
 	return nil
+}
+
+func CrateDb() {
+	db, err := sql.Open("sqlite3", ".qrk/my_database.db")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	sqlStmt := `CREATE TABLE IF NOT EXISTS qrk (id INTEGER NOT NULL PRIMARY KEY, path TEXT UNIQUE);`
+	_, err = db.Exec(sqlStmt)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 // HandleInit handles the "qrk init" command execution.
@@ -53,13 +71,24 @@ func HandleInit() {
 		fmt.Printf("❌ Git Init Warning: %v\n", err)
 	}
 
-	f, err := os.Create(".qrk/index.txt")
+	CrateDb()
+	/*
+		f, err := os.Create(".qrk/index.txt")
+		if err != nil {
+			// Panic here only if we absolutely cannot create the file
+			panic(fmt.Errorf("failed to create index.txt: %w", err))
+		}
+		// Always close the file handle after creating it to avoid memory leaks
+		defer f.Close()
+	*/
+
+	gitignore, err := os.Create(".gitignore")
 	if err != nil {
-		// Panic here only if we absolutely cannot create the file
-		panic(fmt.Errorf("failed to create index.txt: %w", err))
+		panic(fmt.Errorf("failed to create .gitignore: %w", err))
 	}
-	// Always close the file handle after creating it to avoid memory leaks
-	defer f.Close()
+	fmt.Fprintf(gitignore, "HEAD.tar\n work.tar.tmp\n")
+
+	defer gitignore.Close()
 
 	fmt.Println("✨ Successfully initialized empty qrk repository in .qrk/")
 }
