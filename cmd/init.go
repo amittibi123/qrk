@@ -82,7 +82,7 @@ func HandleInit() {
 		defer f.Close()
 	*/
 
-	gitignore, err := os.Create(".gitignore")
+	gitignore, err := os.Create(".qrk/.gitignore")
 	if err != nil {
 		panic(fmt.Errorf("failed to create .gitignore: %w", err))
 	}

@@ -30,7 +30,9 @@ func main() {
 	case "commit":
 		cmd.HandleCommit("")
 	case "head":
-		cmd.HandelHead(os.Args[1:])
+		cmd.HandleHead(os.Args[2:])
+	case "restore":
+		cmd.HandleRestore(os.Args[2:])
 	default:
 		fmt.Printf("❌ Unknown command: '%s'\n", command)
 		fmt.Println("Run 'qrk' without arguments to see available commands.")
